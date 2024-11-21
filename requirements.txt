@@ -1,0 +1,14 @@
+einops==0.8.0
+fire==0.6.0
+h5py==3.11.0
+matplotlib==3.9.2
+numpy==1.26.4
+omegaconf==2.3.0
+pillow==10.4.0
+pytorch_lightning==2.2.1
+scikit-image==0.24.0
+tensorflow==2.18.0
+tensorflow-io-gcs-filesystem==0.37.1
+torch==1.13.1+cu117
+torchmetrics==1.4.2
+tqdm==4.66.5
