@@ -5,6 +5,11 @@ import torch
 from PIL import Image
 import os
 
+import torch
+from torchmetrics.regression import CriticalSuccessIndex
+from collections import deque
+import tensorflow as tf
+
 def show(a):
     plt.imshow(a)
     plt.show()
@@ -184,9 +189,35 @@ def B_mse(a, b):
     mask[fundFlag(a, 5, 10)] = 5
     mask[fundFlag(a, 10, 30)] = 10
     mask[a > 30] = 30
-    n = a.shape[0] * b.shape[0]
+    # n = a.shape[0] * b.shape[0] # this assumes square images
+    n = a.size
     mse = np.sum(mask * ((a - b) ** 2)) / n
     return mse
+
+def B_mse_torch(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+    """Compute the Balanced Mean Squared Error (B-MSE) between two tensors.
+
+    Heavy precipitation has higher weight
+
+    Args:
+        a: Ground truth tensor of shape (batch_size, sequence_length, height, width).
+        b: Prediction tensor of shape (batch_size, sequence_length, height, width).
+
+    Returns:
+        B-MSE loss value for each image pair in the batch, flattened to shape (batch_size * sequence_length).
+    """
+    
+    mask = torch.zeros(a.shape).to(a.device)
+    mask[a < 2] = 1
+    mask[(a >= 2) & (a < 5)] = 2
+    mask[(a >= 5) & (a < 10)] = 5
+    mask[(a >= 10) & (a < 30)] = 10
+    mask[a > 30] = 30
+
+    # weighted MSE based on thresholds, heavy precipitation has higher weight
+    b_mse = torch.mean(mask * ((a - b) ** 2), dim=(2, 3))
+    # flatten to get tensor of shape (batch_size * sequence_length), single value per image pair
+    return b_mse.flatten()
 
 def B_mae(a, b):
     mask = np.zeros(a.shape)
@@ -195,9 +226,35 @@ def B_mae(a, b):
     mask[fundFlag(a, 5, 10)] = 5
     mask[fundFlag(a, 10, 30)] = 10
     mask[a > 30] = 30
-    n = a.shape[0] * b.shape[0]
+    # n = a.shape[0] * b.shape[0]
+    n = a.size
     mae = np.sum(mask * np.abs(a - b)) / n
     return mae
+
+def B_mae_torch(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+    """Compute the Balanced Mean Absolute Error (B-MAE) between two tensors.
+
+    Heavy precipitation has higher weight
+
+    Args:
+        a: Ground truth tensor of shape (batch_size, sequence_length, height, width).
+        b: Prediction tensor of shape (batch_size, sequence_length, height, width).
+
+    Returns:
+        B-MAE loss value for each image pair in the batch, flattened to shape (batch_size * sequence_length).
+    """
+
+    mask = torch.zeros(a.shape).to(a.device)
+    mask[a < 2] = 1
+    mask[(a >= 2) & (a < 5)] = 2
+    mask[(a >= 5) & (a < 10)] = 5
+    mask[(a >= 10) & (a < 30)] = 10
+    mask[a > 30] = 30
+    
+    # weighted MAE based on thresholds, heavy precipitation has higher weight
+    mae = torch.mean(mask * torch.abs(a - b), dim=(2, 3))
+    # flatten to get tensor of shape (batch_size * sequence_length), single value per image pair
+    return mae.flatten()
 
 def draw_color(data):
     B, C, H, W = data.shape
@@ -251,6 +308,27 @@ def csi(pred, gt):
         result.append(_csi(a, b))
     return result
 
+
+def csi_torch(pred_batch: torch.Tensor, gt_batch: torch.Tensor) -> list[torch.Tensor]:
+    """Compute the Critical Success Index (CSI) for a batch of predictions and ground truth.	
+
+    Args:
+        pred_batch: Batch of predictions of shape (batch_size, sequence_length, height, width).
+        gt_batch: Batch of ground truth of shape (batch_size, sequence_length, height, width).
+
+    Returns:
+        List of CSI values for each threshold in [0.5, 2, 5, 10, 30].
+    """
+
+    pred_flat = pred_batch.flatten(end_dim=1)
+    gt_flat = gt_batch.flatten(end_dim=1)
+    threshold = [0.5, 2, 5, 10, 30]
+    result = []
+    for t in threshold:
+        csi = CriticalSuccessIndex(threshold=t, keep_sequence_dim=0)
+        result.append(csi(pred_flat, gt_flat))
+    return result
+
 def hss(pred, gt):
     threshold = [0.5, 2, 5, 10, 30]
     result = []
@@ -262,27 +340,262 @@ def hss(pred, gt):
         result.append(_hss(a, b))
     return result
 
+def hss_torch(pred_batch: torch.Tensor, gt_batch: torch.Tensor) -> list[torch.Tensor]:
+    """PyTorch implementation of hss function above.
+    
+    Args:
+        pred_batch: Batch of predictions of shape (batch_size, sequence_length, height, width).
+        gt_batch: Batch of ground truth of shape (batch_size, sequence_length, height, width).
+        
+    Returns:
+        List of HSS values for each threshold in [0.5, 2, 5, 10, 30].
+    """
+
+    pred_flat = pred_batch.flatten(end_dim=1)
+    gt_flat = gt_batch.flatten(end_dim=1)
+    
+    thresholds = [0.5, 2, 5, 10, 30]
+    results = []
+    
+    for t in thresholds:
+        # Apply thresholding to binarize predictions and ground truth
+        pred_bin = (pred_flat >= t).float()
+        gt_bin = (gt_flat >= t).float()
+
+        TP = torch.sum(pred_bin * gt_bin, dim=(1, 2))  # True positives
+        FN = torch.sum(gt_bin * (1 - pred_bin), dim=(1, 2))  # False negatives
+        FP = torch.sum(pred_bin * (1 - gt_bin), dim=(1, 2))  # False positives
+        TN = torch.sum((1 - pred_bin) * (1 - gt_bin), dim=(1, 2))  # True negatives
+
+        numerator = TP * TN - FN * FP
+        denominator = (TP + FN) * (FN + TN) + (TP + FP) * (FP + TN) + 1e-9
+
+        hss = numerator / denominator
+
+        hss = torch.where(hss < 0, torch.zeros_like(hss), hss)
+
+        results.append(hss)
+    
+    return results
+
+
 import torch
 from torch import nn
 
 class BMAEloss(nn.Module):
-    def __init__(self):
+    """Balanced Mean Absolute Error (B-MAE) loss function for precipitation rate prediction."""
+
+    def __init__(self, norm_dbz_values: bool=False):
+        """Initializes the B-MAE loss function.
+        
+        Args:
+            norm_dbz_values: whether data is converted to dBZ and normalized to the range [0, 1]
+                if True, the loss function will map the thresholds to the corresponding normalized dBZ values
+        """
         super(BMAEloss, self).__init__()
 
+        self.norm_dbz_values = norm_dbz_values
+        if self.norm_dbz_values: 
+            # create mapping from mm/h thresholds to normalized dBZ values
+            self.map_to_dbz = {}
+            thresholds = [2, 5, 10, 30]
+            for t in thresholds:
+                self.map_to_dbz[t] = minmax(torch.tensor(t), norm_method='minmax', convert_to_dbz=True, undo=False).item()
+
     def fundFlag(self, a, n, m):
+        if self.norm_dbz_values:
+            n = self.map_to_dbz[n]
+            m = self.map_to_dbz[m]
+
         flag_1 = (a >= n).int()
         flag_2 = (a < m).int()
         flag_3 = flag_1 + flag_2
         return flag_3 == 2
 
     def forward(self, pred, y):
-        mask = torch.zeros(y.shape).cuda()
+        mask = torch.zeros(y.shape).to(y.device)
         mask[y < 2] = 1
         mask[self.fundFlag(y, 2, 5)] = 2
         mask[self.fundFlag(y, 5, 10)] = 5
         mask[self.fundFlag(y, 10, 30)] = 10
         mask[y > 30] = 30
         return torch.sum(mask * torch.abs(y - pred))
+
+
+# class BMAEloss_norm_dbz(nn.Module):
+#     """Balanced Mean Absolute Error (B-MAE) loss function for precipitation rate prediction.
+    
+#     Adapted to work with values that are converted to dBZ and then normalized to the range [0, 1].
+
+#     """
+#     def __init__(self):
+#         super(BMAEloss, self).__init__()
+#         self.map_to_dbz = {}
+#         thresholds = [2, 5, 10, 30]
+#         for t in thresholds:
+#             self.map_to_dbz[t] = minmax(t, norm_method='minmax', convert_to_dbz=True, undo=False)            
+
+#     def fundFlag(self, a, n, m):
+#         flag_1 = (a >= n).int()
+#         flag_2 = (a < m).int()
+#         flag_3 = flag_1 + flag_2
+#         return flag_3 == 2
+
+#     def forward(self, pred, y):
+#         mask = torch.zeros(y.shape).to(y.device)
+#         mask[y < 2] = 1
+#         mask[self.fundFlag(y, 2, 5)] = 2
+#         mask[self.fundFlag(y, 5, 10)] = 5
+#         mask[self.fundFlag(y, 10, 30)] = 10
+#         mask[y > 30] = 30
+#         return torch.sum(mask * torch.abs(y - pred))
+   
+
+def r_to_dbz(r):
+    '''
+    Convert mm/h to dbz
+    '''
+    # Convert to dBZ
+    return 10 * torch.log10(200*r**(8/5)+1) 
+
+def dbz_to_r(dbz):
+    '''
+    Convert dbz to mm/h
+    '''
+    ratio = ((10**(dbz/10)-1)/200)
+    ratio = torch.clamp(ratio, min=0)
+    r = ratio**(5/8)
+    return r
+
+def minmax(x, norm_method='minmax', convert_to_dbz = False, undo = False):
+    '''
+    Performs minmax scaling to scale the images to range of 0 to 1.
+    norm_method: 'minmax' or 'minmax_tanh'. If tanh is used than scale to -1 to 1 as tanh
+                is used for activation function generator, else scale values to be between 0 and 1
+    '''
+    assert norm_method == 'minmax' or norm_method == 'minmax_tanh'
+    
+    # define max intensity as 100mm
+    MIN = 0
+    MAX = 100
+    
+    if not undo:
+        if convert_to_dbz:
+            MAX = 55
+            x = r_to_dbz(x)
+        # Set values over 100mm/h to 100mm/h
+        x = torch.clamp(x, MIN, MAX)
+        if norm_method == 'minmax_tanh':
+            x = (x - MIN - MAX/2)/(MAX/2 - MIN) 
+        else:
+            x = (x - MIN)/(MAX - MIN)
+    else:
+        if convert_to_dbz:
+            MAX = 55
+        if norm_method == 'minmax_tanh':
+            x = x*(MAX/2 - MIN) + MIN + MAX/2
+        else:
+            x = x*(MAX - MIN) + MIN           
+    return x
+
+
+def undo_dgmr_prep(
+        x: torch.Tensor, 
+        norm_method: str='minmax', 
+        r_to_dbz: bool=True, 
+        downscale256: bool=True, 
+        resize_method: tf.image.ResizeMethod = tf.image.ResizeMethod.BILINEAR
+        ):
+    """Reverse the preprocessing steps applied to the input data
+
+    Reverses the preprocessing steps applied to the input data, such as normalization, conversion to dbz, and downscaling.
+    Undoing the preprocessing is necessary to compute metrics that assume the input is in mm/h and unnormalized.
+    
+    Args:
+        x: input tensor
+        norm_method: normalization method used
+        r_to_dbz: whether the input was converted to dbz
+        downscale256: whether the input was downscaled to 256x256 (if True, upscales to 765x700)
+        resize_method: method used for resizing the image (default: tf.image.ResizeMethod.BILINEAR)
+
+    Returns:
+        tensor with preprocessing undone
+    """
+
+    if norm_method:
+        x = minmax(x, norm_method = norm_method, convert_to_dbz = r_to_dbz, undo = True)
+    if r_to_dbz:
+        x = dbz_to_r(x)
+    if downscale256:
+        # Upsample the image using bilinear interpolation
+        tf.config.set_visible_devices([], 'GPU') # ensure that the image is upsampled on the CPU
+        device = x.device
+
+        x = to_np(x.permute(0, 2, 3, 1))
+        x_tf =  tf.image.resize(x, (768, 768), method=resize_method)
+        # Original shape was 765x700, crop prediction so that it fits this
+        x_tf = x_tf[:, :-3,:-68, :]
+
+        # Convert back to torch tensor and move to original device
+        x_np = tf.transpose(x_tf, perm=[0, 3, 1, 2]).numpy()
+        x = torch.from_numpy(x_np).to(device)
+    
+    return x
+
+class CheckpointSaver:
+    """Utility class to save model checkpoints during training and keep track of the best checkpoints based on validation loss."""
+
+    def __init__(self, ddp: bool, model_dir: str, k_best: int=3):
+        """Initializes the CheckpointSaver.	
+        
+        Args:
+            ddp: whether DistributedDataParallel (DDP) is used
+            model_dir: directory to save the checkpoints
+            k_best: number of best checkpoints to keep
+        """
+        self.model_dir = model_dir
+        self.k_best = k_best
+        self.best_checkpoints = []
+        self.ddp = ddp
+        
+    def save_checkpoint(self, model: torch.nn.Module, optimizer: torch.optim.Optimizer, lr_scheduler: torch.optim.lr_scheduler._LRScheduler, epoch: int, val_loss: float):
+        """Saves a model checkpoint and updates the best checkpoints list if necessary.
+
+        Args:
+
+            model: model to save
+            optimizer: optimizer to save
+            lr_scheduler: learning rate scheduler to save
+            epoch: current epoch
+            val_loss: validation loss of the model
+        """
+
+        if self.ddp:
+            model = model.module
+        checkpoint = {
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'lr_scheduler_state_dict': lr_scheduler.state_dict(),
+            'epoch': epoch,
+            'val_loss': val_loss
+        }
+        
+        # Save last checkpoint
+        last_checkpoint_path = os.path.join(self.model_dir, 'last.ckpt')
+        torch.save(checkpoint, last_checkpoint_path)
+        
+        # Save top-k checkpoints
+        if len(self.best_checkpoints) < self.k_best or val_loss < self.best_checkpoints[-1][0]:
+            checkpoint_path = os.path.join(self.model_dir, f'best-epoch{epoch}-loss{val_loss:.4f}.ckpt')
+            torch.save(checkpoint, checkpoint_path)
+            
+            self.best_checkpoints.append((val_loss, checkpoint_path))
+            self.best_checkpoints = sorted(self.best_checkpoints, key=lambda x: x[0])
+            
+            # Remove worst checkpoint if we have more than k
+            if len(self.best_checkpoints) > self.k_best:
+                _, worst_checkpoint_path = self.best_checkpoints.pop()
+                os.remove(worst_checkpoint_path)
 
 
 # import matplotlib.pyplot as plt
