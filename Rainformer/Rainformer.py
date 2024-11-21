@@ -3,42 +3,42 @@ from torch import nn
 from SwinTransformer import StageModule, StageModule_up, StageModule_up_final
 
 class Net(nn.Module):
-    def __init__(self, input_channel, hidden_dim, downscaling_factors, layers, heads, head_dim, window_size, relative_pos_embedding):
+    def __init__(self, input_channel, output_channel, hidden_dim, downscaling_factors, layers, heads, head_dim, window_size, relative_pos_embedding):
         super(Net, self).__init__()
         self.stage1 = StageModule(in_channels=input_channel, hidden_dimension=hidden_dim, layers=layers[0],
                                   downscaling_factor=downscaling_factors[0], num_heads=heads[0], head_dim=head_dim,
-                                  window_size=window_size, relative_pos_embedding=relative_pos_embedding, h_w=[72, 72])
+                                  window_size=window_size, relative_pos_embedding=relative_pos_embedding, h_w=[64, 64])
 
         self.stage2 = StageModule(in_channels=hidden_dim, hidden_dimension=hidden_dim * 2, layers=layers[1],
                                   downscaling_factor=downscaling_factors[1], num_heads=heads[1], head_dim=head_dim,
-                                  window_size=window_size, relative_pos_embedding=relative_pos_embedding, h_w=[36, 36])
+                                  window_size=window_size, relative_pos_embedding=relative_pos_embedding, h_w=[32, 32])
 
         self.stage3 = StageModule(in_channels=hidden_dim * 2, hidden_dimension=hidden_dim * 4, layers=layers[2],
                                   downscaling_factor=downscaling_factors[2], num_heads=heads[2], head_dim=head_dim,
-                                  window_size=window_size, relative_pos_embedding=relative_pos_embedding, h_w=[18, 18])
+                                  window_size=window_size, relative_pos_embedding=relative_pos_embedding, h_w=[16, 16])
 
         self.stage4 = StageModule(in_channels=hidden_dim * 4, hidden_dimension=hidden_dim * 8, layers=layers[3],
                                   downscaling_factor=downscaling_factors[3], num_heads=heads[3], head_dim=head_dim,
-                                  window_size=window_size, relative_pos_embedding=relative_pos_embedding, h_w=[9, 9])
+                                  window_size=window_size, relative_pos_embedding=relative_pos_embedding, h_w=[8, 8])
 
         # ----------------------------------------------------------------------------------------
 
         self.stage5 = StageModule_up(in_channels=hidden_dim * 8, hidden_dimension=hidden_dim * 4,
                                      layers=layers[3], upscaling_factor=downscaling_factors[3], num_heads=heads[3], head_dim=head_dim,
-                                     window_size=window_size, relative_pos_embedding=relative_pos_embedding, h_w=[18, 18])
+                                     window_size=window_size, relative_pos_embedding=relative_pos_embedding, h_w=[16, 16])
 
         self.stage6 = StageModule_up(in_channels=hidden_dim * 8, hidden_dimension=hidden_dim * 2,
                                      layers=layers[2], upscaling_factor=downscaling_factors[2], num_heads=heads[2], head_dim=head_dim,
-                                     window_size=window_size, relative_pos_embedding=relative_pos_embedding, h_w=[36, 36])
+                                     window_size=window_size, relative_pos_embedding=relative_pos_embedding, h_w=[32, 32])
 
         self.stage7 = StageModule_up(in_channels=hidden_dim * 4, hidden_dimension=hidden_dim * 1,
                                      layers=layers[1], upscaling_factor=downscaling_factors[1], num_heads=heads[1], head_dim=head_dim,
-                                     window_size=window_size, relative_pos_embedding=relative_pos_embedding, h_w=[72, 72])
+                                     window_size=window_size, relative_pos_embedding=relative_pos_embedding, h_w=[64, 64])
 
-        self.stage8 = StageModule_up_final(in_channels=hidden_dim * 2, hidden_dimension=input_channel,
+        self.stage8 = StageModule_up_final(in_channels=hidden_dim * 2, hidden_dimension=output_channel,
                                      layers=layers[0], upscaling_factor=downscaling_factors[0], num_heads=heads[0],
                                      head_dim=head_dim,
-                                     window_size=window_size, relative_pos_embedding=relative_pos_embedding, h_w=[288, 288])
+                                     window_size=window_size, relative_pos_embedding=relative_pos_embedding, h_w=[256, 256])
 
     def forward(self, x):
         x1 = self.stage1(x)     # (4, 96, 72, 72)
