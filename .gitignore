@@ -1,0 +1,10 @@
+# venv
+.rainformer_venv/
+
+# logs and checkpoints
+Rainformer/wandb/
+wandb/
+results/
+
+__pycache__/
+Rainformer/__pycache__/
