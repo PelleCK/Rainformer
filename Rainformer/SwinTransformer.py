@@ -17,14 +17,14 @@ class GRU(nn.Module):
             nn.Conv2d(channel * 2, channel * 2, kernel_size=kernel_size, stride=stride, padding=padding),
             nn.LayerNorm([channel * 2, height, width]),
         )
-        self.conv_2 = nn.Sequential(
-            nn.Conv2d(channel, channel, kernel_size=kernel_size, stride=stride, padding=padding),
-            nn.LayerNorm([channel, height, width]),
-        )
-        self.conv_3 = nn.Sequential(
-            nn.Conv2d(channel * 2, channel, kernel_size=kernel_size, stride=stride, padding=padding),
-            nn.LayerNorm([channel, height, width]),
-        )
+        # self.conv_2 = nn.Sequential(
+        #     nn.Conv2d(channel, channel, kernel_size=kernel_size, stride=stride, padding=padding),
+        #     nn.LayerNorm([channel, height, width]),
+        # )
+        # self.conv_3 = nn.Sequential(
+        #     nn.Conv2d(channel * 2, channel, kernel_size=kernel_size, stride=stride, padding=padding),
+        #     nn.LayerNorm([channel, height, width]),
+        # )
 
         self.leaky_relu = nn.LeakyReLU(0.2)
 
