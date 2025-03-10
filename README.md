@@ -1,24 +1,26 @@
 # Rainformer
 
-Rainformer is a PyTorch-based encoder-forecaster model for precipitation nowcasting, as introduced in [Rainformer: Features Extraction Balanced Network for Radar-Based Precipitation Nowcasting](https://ieeexplore.ieee.org/abstract/document/9743916). This repository is a fork of the original Rainformer repository and includes adaptations to support my thesis research on **precipitation nowcasting**, specifically focusing on high-intensity precipitation prediction. My research compares Rainformer with several state-of-the-art deep generative models, ensuring a robust evaluation under a consistent experimental framework.
+Rainformer is a PyTorch-based encoder-forecaster model for precipitation nowcasting, as introduced in [Rainformer: Features Extraction Balanced Network for Radar-Based Precipitation Nowcasting](https://ieeexplore.ieee.org/abstract/document/9743916). This repository is a fork of the original Rainformer repository and includes adaptations to support my thesis research on **precipitation nowcasting**, specifically focusing on high-intensity precipitation prediction. My research focuses on the effect of input and output sequence length on the model's performance, as well as the impact of adding temperature data to the input features.
 
 ---
 
 ## Key Features
 
-- **Rainformer Model**:
+- **Rainformer**:
   - A precipitation nowcasting model combining local and global attention mechanisms.
   - Includes channel-attention and spatial-attention modules for effective feature extraction.
 
-- **Research Contributions**:
-  - Customizations to integrate Rainformer with my specific data setup.
-  - Modifications to streamline experiments comparing Rainformer with other advanced models.
+- **Contributions**:
+  - Customizations to train and evaluate Rainformer with our data setup.
+  - Add possibility to train on a multi-gpu cluster environment with SLURM.
+  - Support for logging with Weights & Biases.
+  - Additional evaluation metrics for precipitation nowcasting.
 
 ---
 
 ## Requirements
 
-This repository requires **Python 3.10.12**. All other dependencies are listed in `requirements.txt`. To set up your environment:
+This repository uses **Python 3.10.12**. All other dependencies are listed in `requirements.txt`. To set up your environment:
 
 1. Create and activate a Python virtual environment:
    ```
@@ -49,15 +51,16 @@ To submit a training job on SLURM:
 ./submit_job.sh [job_name] [wandb_api_key]
 ```
 
-- The `submit_job.sh` script:
+- The [`submit_job.sh`](./Rainformer/submit_job.sh) script:
   - Automatically sets up logging directories.
-  - Exports the necessary environment variables for Weights & Biases tracking.
-  - Submits the `train.sh` script to SLURM using `sbatch`.
+  - Exports the Weights & Biases API key for logging.
+  - Submits the [`train.sh`](./Rainformer/train.sh) script to SLURM using `sbatch`.
 
-- The `train.sh` script configures:
-  - SLURM-specific parameters (e.g., GPUs, CPUs, memory).
+- The [`train.sh`](./Rainformer/train.sh) script:
+  - Configures SLURM-specific parameters (e.g., GPUs, CPUs, memory).
   - Distributed Data Parallel (DDP) settings (`MASTER_ADDR`, `MASTER_PORT`, `WORLD_SIZE`).
-  - Paths for model checkpoints and data directories.
+  - Defines paths for model checkpoints and data directories.
+  - Runs [`train_on_cluster_ddp.py`](./Rainformer/train_on_cluster_ddp.py) with the specified configuration.
 
 ### Training Locally on a Single GPU
 
