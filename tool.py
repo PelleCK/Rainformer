@@ -17,12 +17,14 @@ def show(a):
 def to_np(a):
     return a.cpu().detach().numpy()
 
-def get_data():
-    root = '../../../../data/sf/KNMI/KNMI.h5'
+def get_data(root='../../../../data/sf/KNMI/KNMI.h5', test_only=False):
     f = h5py.File(root, mode='r')
-    train = f['train']
+    train_image = None
+    if not test_only:
+        train = f['train']
+        train_image = train['images']
+        
     test = f['test']
-    train_image = train['images']
     test_image = test['images']
     return train_image, test_image
 
@@ -545,7 +547,7 @@ def undo_dgmr_prep(
 class CheckpointSaver:
     """Utility class to save model checkpoints during training and keep track of the best checkpoints based on validation loss."""
 
-    def __init__(self, ddp: bool, model_dir: str, k_best: int=3):
+    def __init__(self, ddp: bool, model_dir: str, k_best: int=3, save_all: bool=False):
         """Initializes the CheckpointSaver.	
         
         Args:
@@ -557,6 +559,7 @@ class CheckpointSaver:
         self.k_best = k_best
         self.best_checkpoints = []
         self.ddp = ddp
+        self.save_all = save_all
         
     def save_checkpoint(self, model: torch.nn.Module, optimizer: torch.optim.Optimizer, lr_scheduler: torch.optim.lr_scheduler._LRScheduler, epoch: int, val_loss: float):
         """Saves a model checkpoint and updates the best checkpoints list if necessary.
@@ -583,6 +586,10 @@ class CheckpointSaver:
         # Save last checkpoint
         last_checkpoint_path = os.path.join(self.model_dir, 'last.ckpt')
         torch.save(checkpoint, last_checkpoint_path)
+
+        if self.save_all:
+            checkpoint_path = os.path.join(self.model_dir, f'epoch{epoch}-loss{val_loss:.4f}.ckpt')
+            torch.save(checkpoint, checkpoint_path)
         
         # Save top-k checkpoints
         if len(self.best_checkpoints) < self.k_best or val_loss < self.best_checkpoints[-1][0]:
@@ -596,6 +603,80 @@ class CheckpointSaver:
             if len(self.best_checkpoints) > self.k_best:
                 _, worst_checkpoint_path = self.best_checkpoints.pop()
                 os.remove(worst_checkpoint_path)
+
+
+def visualize_single(sample_x, sample_y, prediction, mask, cmap_name='intensity', unit='mm/h'):
+    """
+    Visualize the last input image along with ground truth and predicted outputs for a single sequence.
+
+    Parameters:
+    - sample_x: numpy array of shape (t_x, h, w), the input sequence.
+    - sample_y: numpy array of shape (t_y, h, w), the ground truth output sequence.
+    - prediction: numpy array of shape (t_y, h, w), the predicted output sequence.
+    - mask: numpy array of shape (h, w), a boolean mask to apply to images.
+    - cmap_name: str, colormap name for visualization (default is 'intensity').
+    - unit: str, the unit for the colormap (default is 'mm/h').
+
+    Returns:
+    None, displays the visualization plot.
+    """
+    cmap, norm, _, _ = get_colormap(cmap_name, unit, 'pysteps')
+
+    # Last input image
+    last_input = sample_x[-1, :, :]
+
+    # Visualize last input + ground truth outputs
+    ground_truth_images = np.concatenate([last_input[np.newaxis, :, :], sample_y], axis=0)
+    ground_truth_titles = ["Last Input"] + [f"True Output {j+1}" for j in range(sample_y.shape[0])]
+
+    # Visualize last input + predicted outputs
+    predicted_images = np.concatenate([last_input[np.newaxis, :, :], prediction], axis=0)
+    predicted_titles = ["Last Input"] + [f"Pred Output {j+1}" for j in range(prediction.shape[0])]
+
+    fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+
+    # Plot ground truth images
+    for idx, img in enumerate(ground_truth_images):
+        img = np.nan_to_num(img)
+        img[~mask] = np.nan
+        axes[0].imshow(img, cmap=cmap, norm=norm)
+        axes[0].axis('off')
+        axes[0].set_title(ground_truth_titles[idx])
+
+    # Plot predicted images
+    for idx, img in enumerate(predicted_images):
+        img = np.nan_to_num(img)
+        img[~mask] = np.nan
+        axes[1].imshow(img, cmap=cmap, norm=norm)
+        axes[1].axis('off')
+        axes[1].set_title(predicted_titles[idx])
+
+    axes[0].set_title("Ground Truth")
+    axes[1].set_title("Predicted")
+
+    plt.tight_layout()
+    plt.savefig(f"figures/visualize_single.png")
+    plt.show()
+
+def visualize_batch(batch_x, batch_y, predictions, mask, cmap_name='intensity', unit='mm/h'):
+    """
+    Visualize the last input image along with ground truth and predicted outputs for a batch of sequences.
+
+    Parameters:
+    - batch_x: numpy array of shape (b, t_x, h, w), the input sequences.
+    - batch_y: numpy array of shape (b, t_y, h, w), the ground truth output sequences.
+    - predictions: numpy array of shape (b, t_y, h, w), the predicted output sequences.
+    - mask: numpy array of shape (h, w), a boolean mask to apply to images.
+    - cmap_name: str, colormap name for visualization (default is 'intensity').
+    - unit: str, the unit for the colormap (default is 'mm/h').
+
+    Returns:
+    None, displays the visualization plots.
+    """
+    b = batch_x.shape[0]
+
+    for i in range(b):
+        visualize_single(batch_x[i], batch_y[i], predictions[i], mask, cmap_name, unit)
 
 
 # import matplotlib.pyplot as plt
