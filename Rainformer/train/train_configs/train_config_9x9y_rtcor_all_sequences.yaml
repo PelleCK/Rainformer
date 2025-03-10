@@ -1,0 +1,14 @@
+x_seq_size: 9
+y_seq_size: 9
+window_size: 8
+epoch_size: 200
+base_batch_size: 16
+norm_dbz_values: True
+train_IDs_fn: '/vol/knmimo-nobackup/restore/knmimo/thesis_pelle/data/preprocessed/data_splits/train_rainformer_200922_avg001mm_9x9y_all.npy'
+val_IDs_fn: '/vol/knmimo-nobackup/restore/knmimo/thesis_pelle/data/preprocessed/data_splits/val_rainformer_2008_avg001mm_9x9y_all.npy'
+data_path: '/vol/knmimo-nobackup/restore/knmimo/thesis_pelle/data/preprocessed/rtcor_prep'
+ckpt_path: null
+model_dir: '/vol/knmimo-nobackup/users/pkools/thesis-forecasting/Rainformer/results/model_checkpoints/${oc.env:SLURM_JOB_NAME}/'
+lr_orig: 0.0001
+batch_size_orig: 16
+y_seq_size_orig: 9

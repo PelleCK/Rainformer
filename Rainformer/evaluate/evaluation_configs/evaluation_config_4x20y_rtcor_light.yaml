@@ -1,0 +1,10 @@
+batch_size: 64
+test_IDs_fn: "/vol/knmimo-nobackup/restore/knmimo/thesis_pelle/data/preprocessed/data_splits/LIGHT_test_202324_avg001mm_4x20y.npy"
+checkpoint_path: "/vol/knmimo-nobackup/users/pkools/thesis-forecasting/Rainformer/results/model_checkpoints/rainformer_ddp_24_11/epoch17-loss23997.2495.ckpt"
+data_path: "/vol/knmimo-nobackup/restore/knmimo/thesis_pelle/data/preprocessed/rtcor_prep"
+x_seq_size: 4
+y_seq_size: 20
+window_size: 8
+input_h_w: [256, 256]
+use_orig_data: false
+undo_prep: true
