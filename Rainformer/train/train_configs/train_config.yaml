@@ -1,11 +1,11 @@
-x_seq_size: 4
+x_seq_size: 9
 y_seq_size: 9
 window_size: 8
 epoch_size: 200
 base_batch_size: 16
 norm_dbz_values: True
-train_IDs_fn: '${oc.env:DATA_SPLITS_DIR}/train_rainformer_200922_avg001mm_4x9y_cropped_from_9x9y.npy'
-val_IDs_fn: '${oc.env:DATA_SPLITS_DIR}/val_rainformer_2008_avg001mm_4x9y_cropped_from_9x9y.npy'
+train_IDs_fn: '${oc.env:DATA_SPLITS_DIR}/train_rainformer_200922_avg001mm_9x9y_all.npy'
+val_IDs_fn: '${oc.env:DATA_SPLITS_DIR}/val_rainformer_2008_avg001mm_9x9y_all.npy'
 data_path: '${oc.env:PREPROCESSED_RTCOR_DIR}/'
 ckpt_path: null
 model_dir: '${oc.env:GENERAL_MODEL_DIR}/${oc.env:SLURM_JOB_NAME}/'

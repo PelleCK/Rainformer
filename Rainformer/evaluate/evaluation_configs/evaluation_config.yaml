@@ -1,9 +1,9 @@
-batch_size: 64
-test_IDs_fn: "/vol/knmimo-nobackup/restore/knmimo/thesis_pelle/data/preprocessed/data_splits/ldcast_test_202324_avg001mm_4x20y.npy"
-checkpoint_path: "/vol/knmimo-nobackup/users/pkools/thesis-forecasting/Rainformer/results/model_checkpoints/rainformer_ddp_24_11/epoch17-loss23997.2495.ckpt"
-data_path: "/vol/knmimo-nobackup/restore/knmimo/thesis_pelle/data/preprocessed/rtcor_prep"
-x_seq_size: 4
-y_seq_size: 20
+batch_size: 16
+test_IDs_fn: "${oc.env:DATA_SPLITS_DIR}/test_rainformer_202324_avg001mm_9x9y.npy"
+checkpoint_path: "${oc.env:GENERAL_MODEL_DIR}/train_rainformer_9x9_consistent_data/epoch26-loss8224.1187.ckpt"
+data_path: "${oc.env:PREPROCESSED_RTCOR_DIR}/"
+x_seq_size: 9
+y_seq_size: 9
 window_size: 8
 input_h_w: [256, 256]
 use_orig_data: false

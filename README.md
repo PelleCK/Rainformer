@@ -46,21 +46,24 @@ This repository supports both **single-GPU** and **multi-GPU** training setups. 
 
 ### Training on SLURM
 
-To submit a training job on SLURM:
+To submit a training job on SLURM, go into the `Rainformer/train` directory and run the following command:
 ```
 ./submit_job.sh [job_name] [wandb_api_key]
 ```
+Here, you must add a `job_name`, as it will be used to create directories for logging and model checkpoints. The `wandb_api_key` is optional and can be used to log training metrics with Weights & Biases. If not provided, the script will skip logging.
 
-- The [`submit_job.sh`](./Rainformer/submit_job.sh) script:
-  - Automatically sets up logging directories.
+- The [`submit_job.sh`](./Rainformer/train/submit_job.sh) script:
+  - Automatically sets up logging and model checkpoint directories.
   - Exports the Weights & Biases API key for logging.
   - Submits the [`train.sh`](./Rainformer/train.sh) script to SLURM using `sbatch`.
 
 - The [`train.sh`](./Rainformer/train.sh) script:
   - Configures SLURM-specific parameters (e.g., GPUs, CPUs, memory).
-  - Distributed Data Parallel (DDP) settings (`MASTER_ADDR`, `MASTER_PORT`, `WORLD_SIZE`).
-  - Defines paths for model checkpoints and data directories.
+  - Defines the Distributed Data Parallel (DDP) settings (`MASTER_ADDR`, `MASTER_PORT`, `WORLD_SIZE`).
+  - defines the config file path
   - Runs [`train_on_cluster_ddp.py`](./Rainformer/train_on_cluster_ddp.py) with the specified configuration.
+
+A typical configuration file is provided in [`train_config.yaml`](./Rainformer/train/train_configs/config.yaml). You can modify the configuration file to adjust the training parameters.
 
 ### Training Locally on a Single GPU
 
@@ -85,6 +88,29 @@ Ensure the following for local training:
 
 ---
 
+## Evaluation
+
+To evaluate the model, the pipeline is similar to training. In the `Rainformer/evaluate` directory, you can run the evaluation script:
+```
+./submit_test.sh [job_name]
+```
+Which will submit the [`test.sh`](./Rainformer/evaluate/test.sh) script to SLURM. Then `test.sh` will run the [`test_on_cluster.py`](./Rainformer/evaluate/test_on_cluster.py) script with the specified configuration file (set in `test.sh`). An example configuration file is provided in [`evaluation_config.yaml`](./Rainformer/evaluate/test_configs/config.yaml).
+
+### Evaluation on multiple lead times
+
+To evaluate the model on a specific lead time, you can add the `--lead_time` argument to this line in the `test.sh` script:
+```
+srun --export=ALL python test_on_cluster.py --config_path=$CONFIG_FILE --lead_time=[lead time]
+```
+(or you can add it in the config file directly)
+
+However, if you want to evaluate the model on multiple lead times, you can run the following command:
+```
+./submit_test_array.sh [job_name]
+```
+which works similarly to `submit_test.sh`, but it submits the [`test_array.sh`](./Rainformer/evaluate/test_array.sh) script to SLURM. This script will run the [`test_on_cluster.py`](./Rainformer/evaluate/test_on_cluster.py) script for each lead time specified in the `test_array.sh` file. Each variation of the evaluation script will be submitted as a separate job to SLURM and run in parallel if resources are available.
+
+Results will be saved in the `results` directory.
 
 ## Citation
 
